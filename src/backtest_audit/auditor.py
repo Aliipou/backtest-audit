@@ -192,6 +192,13 @@ class AuditReport:
         _SKIP_ICON = "[SKIP]"
 
         def _icon(v: str) -> str:
+            # normalize module-specific verdicts to PASS/WARN/FAIL
+            _norm = {
+                "STRONG": "PASS", "MARGINAL": "WARN", "WEAK": "FAIL",
+                "ROBUST": "PASS", "FRAGILE": "WARN", "BROKEN": "FAIL",
+                "SURVIVE": "PASS", "DEGRADE": "WARN", "COLLAPSE": "FAIL",
+            }
+            v = _norm.get(v, v)
             return {"PASS": _PASS_ICON, "WARN": _WARN_ICON, "FAIL": _FAIL_ICON}.get(v, _SKIP_ICON)
 
         width = 72
@@ -240,7 +247,7 @@ class AuditReport:
             e = self.economic_result
             _row("Economic Significance", f"Sharpe={e.sharpe_ratio:.3f}", e.verdict)
             _row("  Cohen's d", f"{e.cohens_d:.4f} ({e.effect_size_label})", e.verdict)
-            _row("  R² (signal variance)", f"{e.r_squared:.4f}", e.verdict)
+            _row("  R^2 (signal variance)", f"{e.r_squared:.4f}", e.verdict)
             _row("  Ann. Return", f"{e.annualised_return:.2%}", e.verdict)
             _row("  Break-even cost (bps)", f"{e.break_even_cost_bps:.2f}", e.verdict)
             _row("  MDE Sharpe", f"{e.mde_sharpe:.4f}", e.verdict)
