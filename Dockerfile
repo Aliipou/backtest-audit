@@ -8,13 +8,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # ── install dependencies ──────────────────────────────────────────────────────
 FROM base AS deps
 COPY pyproject.toml .
+COPY src/ src/
 RUN pip install --upgrade pip && \
     pip install ".[api]"
 
 # ── production image ──────────────────────────────────────────────────────────
 FROM deps AS production
-COPY src/ src/
-RUN pip install --no-deps -e .
 
 # Non-root user for security
 RUN adduser --disabled-password --gecos "" appuser && \
