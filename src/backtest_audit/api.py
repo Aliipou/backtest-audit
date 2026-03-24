@@ -3,13 +3,17 @@ FastAPI REST API for backtest-audit.
 
 Endpoints
 ---------
-POST /audit             – full audit (DSR + Monte Carlo)
-POST /audit/dsr         – DSR test only
-POST /audit/mc          – Monte Carlo test only
-POST /audit/pbo         – PBO test (requires returns matrix)
-POST /audit/sensitivity – parameter sensitivity test
-GET  /health            – liveness probe
-GET  /metrics           – request counters
+POST /audit                    – full audit (DSR + MC + economic + walk-forward + regime + robustness)
+POST /audit/dsr                – DSR test only
+POST /audit/mc                 – Monte Carlo test only
+POST /audit/pbo                – PBO test (requires returns matrix)
+POST /audit/sensitivity        – parameter sensitivity test
+POST /audit/economic           – economic significance (effect size, MDE, R²)
+POST /audit/walk-forward       – walk-forward OOS validation
+POST /audit/regime             – regime-conditional audit
+POST /audit/robustness         – robustness stress test
+GET  /health                   – liveness probe
+GET  /metrics                  – request counters
 """
 from __future__ import annotations
 
@@ -27,10 +31,14 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .auditor import BacktestAuditor
 from .deflated_sharpe import deflated_sharpe_ratio
+from .economic_significance import economic_significance
 from .logging_config import configure_logging, get_logger
 from .monte_carlo import monte_carlo_permutation_test
 from .pbo import probability_of_backtest_overfitting
+from .regime import regime_audit
+from .robustness import RobustnessTester
 from .sensitivity import parameter_sensitivity
+from .walk_forward import walk_forward_validation
 
 configure_logging()
 logger = get_logger("api")
@@ -122,7 +130,7 @@ async def lifespan(app: FastAPI):  # type: ignore[type-arg]
 
 app = FastAPI(
     title="backtest-audit",
-    version="0.1.0",
+    version="0.2.0",
     description="Statistical overfitting audit tools for algorithmic trading backtests.",
     lifespan=lifespan,
 )
@@ -180,7 +188,7 @@ async def request_middleware(request: Request, call_next: Any) -> Response:
 
 @app.get("/health", tags=["ops"])
 def health() -> dict[str, str]:
-    return {"status": "ok", "version": "0.1.0"}
+    return {"status": "ok", "version": "0.2.0"}
 
 
 @app.get("/metrics", tags=["ops"])
@@ -245,5 +253,80 @@ def run_sensitivity(payload: SensitivityPayload) -> dict:
     """Run parameter sensitivity analysis."""
     try:
         return parameter_sensitivity(payload.results, payload.param_grid)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/audit/economic", tags=["audit"])
+def run_economic(payload: ReturnsPayload) -> dict:
+    """Run economic significance analysis (effect size, MDE, R²)."""
+    try:
+        result = economic_significance(pd.Series(payload.returns))
+        return {
+            "cohens_d": result.cohens_d,
+            "effect_size_label": result.effect_size_label,
+            "mde_sharpe": result.mde_sharpe,
+            "n_obs": result.n_obs,
+            "annualised_return": result.annualised_return,
+            "annualised_vol": result.annualised_vol,
+            "sharpe_ratio": result.sharpe_ratio,
+            "break_even_cost_bps": result.break_even_cost_bps,
+            "r_squared": result.r_squared,
+            "verdict": result.verdict,
+            "notes": result.notes,
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+class WalkForwardPayload(BaseModel):
+    returns: list[float] = Field(..., min_length=20, max_length=50_000)
+    n_splits: int = Field(default=5, ge=2, le=20)
+    periods_per_year: int = Field(default=252, ge=1)
+
+    @field_validator("returns")
+    @classmethod
+    def at_least_two_finite(cls, v: list[float]) -> list[float]:
+        import math
+        finite = [x for x in v if not math.isnan(x) and not math.isinf(x)]
+        if len(finite) < 20:
+            raise ValueError("Need at least 20 finite return values for walk-forward.")
+        return v
+
+
+@app.post("/audit/walk-forward", tags=["audit"])
+def run_walk_forward(payload: WalkForwardPayload) -> dict:
+    """Run walk-forward out-of-sample validation."""
+    try:
+        result = walk_forward_validation(
+            pd.Series(payload.returns),
+            n_splits=payload.n_splits,
+            periods_per_year=payload.periods_per_year,
+        )
+        return result.to_dict()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/audit/regime", tags=["audit"])
+def run_regime(payload: ReturnsPayload) -> dict:
+    """Run regime-conditional audit (per vol/trend regime)."""
+    try:
+        result = regime_audit(
+            pd.Series(payload.returns),
+            n_permutations=min(payload.n_permutations, 200),
+        )
+        return result.to_dict()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/audit/robustness", tags=["audit"])
+def run_robustness(payload: ReturnsPayload) -> dict:
+    """Run robustness stress test — 7 failure scenarios."""
+    try:
+        tester = RobustnessTester(pd.Series(payload.returns))
+        report = tester.run_all()
+        return report.to_dict()
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
