@@ -43,9 +43,12 @@ testpaths = ["tests"]
 addopts = "--tb=short --strict-markers"
 asyncio_mode = "auto"
 
+[tool.ruff]
+line-length = 100
+
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP"]
-ignore = ["UP006", "UP007"]
+ignore = ["UP006", "UP007", "E501"]
 
 [tool.mypy]
 python_version = "3.10"

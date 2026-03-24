@@ -26,7 +26,7 @@ DEFAULT_BACKUP_DIR = Path.home() / ".backtest_audit" / "backups"
 DEFAULT_KEEP_LAST = 30
 
 
-def export_json(report: "AuditReport", path: Path | str, compress: bool = False) -> Path:
+def export_json(report: AuditReport, path: Path | str, compress: bool = False) -> Path:
     """Write *report* to a JSON file. Returns the resolved Path."""
     dest = Path(path).resolve()
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -42,7 +42,7 @@ def export_json(report: "AuditReport", path: Path | str, compress: bool = False)
     return dest
 
 
-def export_csv(report: "AuditReport", path: Path | str) -> Path:
+def export_csv(report: AuditReport, path: Path | str) -> Path:
     """Write a flat CSV of scalar audit metrics. Columns: test, metric, value, verdict."""
     dest = Path(path).resolve()
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -72,7 +72,7 @@ def export_csv(report: "AuditReport", path: Path | str) -> Path:
 
 
 def save_snapshot(
-    report: "AuditReport",
+    report: AuditReport,
     strategy_id: str = "unnamed",
     backup_dir: Path | str = DEFAULT_BACKUP_DIR,
     compress: bool = True,

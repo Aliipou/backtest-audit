@@ -86,7 +86,7 @@ class PBOPayload(BaseModel):
     n_splits: int = Field(default=16, ge=2, le=64)
 
     @model_validator(mode="after")
-    def check_matrix(self) -> "PBOPayload":
+    def check_matrix(self) -> PBOPayload:
         if len(self.returns_matrix) < 2:
             raise ValueError("returns_matrix must have at least 2 strategy columns.")
         lengths = {len(v) for v in self.returns_matrix.values()}

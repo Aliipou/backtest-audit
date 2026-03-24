@@ -16,13 +16,11 @@ Usage
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 import pandas as pd
 
 from .deflated_sharpe import deflated_sharpe_ratio
 from .monte_carlo import monte_carlo_permutation_test
-
 
 # ---------------------------------------------------------------------------
 # AuditReport
@@ -45,8 +43,8 @@ class AuditReport:
 
     dsr_result: dict = field(default_factory=dict)
     monte_carlo_result: dict = field(default_factory=dict)
-    pbo_result: Optional[dict] = None
-    sensitivity_result: Optional[dict] = None
+    pbo_result: dict | None = None
+    sensitivity_result: dict | None = None
 
     # ------------------------------------------------------------------
     # overall_verdict property
