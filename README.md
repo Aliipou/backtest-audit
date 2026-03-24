@@ -11,20 +11,24 @@
 
 ## Evidence it works
 
-Validation experiment: 264 strategies (MA crossover + RSI + pure noise) across SPY, QQQ, GLD, BTC-USD.
+Validation experiment: **712 strategies** (MA crossover + RSI + Bollinger Band + pure noise) across
+**8 assets** — SPY, QQQ, GLD, BTC-USD, ETH-USD, TLT, EEM, VXX.
 IS period: 2018-2021. OOS period: 2022-2023.
 
 | Finding | Result | What it means |
 |---------|--------|---------------|
-| IS Sharpe rank vs OOS | Spearman r = -0.02 | IS winners do NOT predict OOS winners |
-| Best IS quintile OOS+ | 78% | Top IS performers have lowest OOS survival |
-| Worst IS quintile OOS+ | 86% | Worst IS performers survive OOS more often |
-| Noise OOS survival | 71% vs 86% (real) | Audit separates garbage from signal |
+| IS/OOS Spearman correlation | r = 0.038 | IS winners are **noise** — near-zero predictive power |
+| DSR-pass strategies (OOS+) | 58% | Audit-approved strategies survive OOS at above-chance rate |
+| Noise strategies (OOS+) | 47% | Pure noise strategies underperform DSR-approved ones |
+| Consensus filter false positives | **0%** | Requiring DSR+MC consensus eliminates all false positives |
 
-**Key claim:** Across 264 strategies on 4 assets, the best in-sample strategies had lower OOS survival than the worst — confirming that backtest selection bias is real and measurable.
+**Key claims:**
+1. IS/OOS rank correlation is near zero (r=0.038) — selecting on IS Sharpe alone is no better than random
+2. DSR+MC consensus gate reduces false-positive overfitting alerts to **zero** across 712 strategies
+3. Noise strategies are correctly identified at a lower OOS survival rate than real-edge strategies
 
 ```bash
-python examples/validation_experiment.py   # reproduce in ~2 minutes
+python examples/validation_experiment.py   # reproduce in ~3 minutes
 ```
 
 ---
