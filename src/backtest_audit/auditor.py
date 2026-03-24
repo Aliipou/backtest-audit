@@ -61,6 +61,50 @@ class AuditReport:
     robustness_report: RobustnessReport | None = None
 
     # ------------------------------------------------------------------
+    # overall_risk_score — continuous [0, 1] signal for live integration
+    # ------------------------------------------------------------------
+
+    def overall_risk_score(self) -> float:
+        """
+        Return a continuous overfitting risk score in [0, 1].
+
+        0.0 = no evidence of overfitting (use full position size)
+        1.0 = strong evidence of overfitting (scale to zero / halt)
+
+        Mapping:
+          PASS -> 0.0  WARN -> 0.4  FAIL -> 0.8
+        Each test contributes equally; result is capped at 1.0.
+
+        Suitable for: position_size = base_size * (1 - risk_score)
+        """
+        verdict_to_risk = {"PASS": 0.0, "WARN": 0.4, "FAIL": 0.8}
+        scores: list[float] = []
+
+        for result in (self.dsr_result, self.monte_carlo_result,
+                       self.pbo_result, self.sensitivity_result):
+            if result:
+                scores.append(verdict_to_risk.get(result.get("verdict", "FAIL"), 0.8))
+
+        if self.economic_result:
+            eco_map = {"STRONG": 0.0, "MARGINAL": 0.35, "WEAK": 0.75}
+            scores.append(eco_map.get(self.economic_result.verdict, 0.5))
+
+        if self.walk_forward_result:
+            scores.append(verdict_to_risk.get(self.walk_forward_result.verdict, 0.8))
+
+        if self.regime_result:
+            regime_map = {"ROBUST": 0.0, "FRAGILE": 0.4, "BROKEN": 0.8}
+            scores.append(regime_map.get(self.regime_result.overall_verdict, 0.8))
+
+        if self.robustness_report:
+            rob_map = {"ROBUST": 0.0, "FRAGILE": 0.35, "BROKEN": 0.75}
+            scores.append(rob_map.get(self.robustness_report.overall_verdict, 0.75))
+
+        if not scores:
+            return 1.0  # no data = maximum caution
+        return min(1.0, float(sum(scores) / len(scores)))
+
+    # ------------------------------------------------------------------
     # overall_verdict property
     # ------------------------------------------------------------------
 
