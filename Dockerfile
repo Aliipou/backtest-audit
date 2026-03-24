@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # ── install dependencies ──────────────────────────────────────────────────────
 FROM base AS deps
-COPY pyproject.toml .
+COPY pyproject.toml README.md ./
 COPY src/ src/
 RUN pip install --upgrade pip && \
     pip install ".[api]"
