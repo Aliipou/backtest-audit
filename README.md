@@ -7,30 +7,43 @@
 
 **Catch overfitting before it costs you money.**
 
-A strategy with Sharpe 1.2 on SPY data. Looks great — until you run the audit:
+---
+
+## Evidence it works
+
+Validation experiment: 264 strategies (MA crossover + RSI + pure noise) across SPY, QQQ, GLD, BTC-USD.
+IS period: 2018-2021. OOS period: 2022-2023.
+
+| Finding | Result | What it means |
+|---------|--------|---------------|
+| IS Sharpe rank vs OOS | Spearman r = -0.02 | IS winners do NOT predict OOS winners |
+| Best IS quintile OOS+ | 78% | Top IS performers have lowest OOS survival |
+| Worst IS quintile OOS+ | 86% | Worst IS performers survive OOS more often |
+| Noise OOS survival | 71% vs 86% (real) | Audit separates garbage from signal |
+
+**Key claim:** Across 264 strategies on 4 assets, the best in-sample strategies had lower OOS survival than the worst — confirming that backtest selection bias is real and measurable.
+
+```bash
+python examples/validation_experiment.py   # reproduce in ~2 minutes
+```
+
+---
+
+## What a strategy with Sharpe 1.2 actually looks like
 
 ```
 Deflated Sharpe Ratio     DSR=-75.6   [FAIL]   <- selected from 19 combos
 Probability of Overfitting  PBO=1.00  [FAIL]   <- 100% chance this is luck
 Economic Significance       d=0.051   [WARN]   <- negligible effect size
 Regime: trend_down          SR=-3.48  [FAIL]   <- collapses in bear markets
+Robustness: 3/7 survived    FRAGILE   [WARN]   <- edge breaks under stress
+
+OVERALL VERDICT: FAIL
 ```
-
-**VERDICT: FAIL** — the edge isn't real. This is what backtest-audit catches.
-
----
-
-## Live Demo
 
 ```bash
-git clone https://github.com/Aliipou/backtest-audit
-cd backtest-audit
-pip install -e ".[dev]" && pip install yfinance
-python examples/audit_demo.py
+python examples/audit_demo.py   # real SPY data, runs in 30 seconds
 ```
-
-Downloads real SPY data, backtests a moving-average strategy grid (19 combos),
-runs the full 8-test audit, and shows you exactly why the "best" strategy is overfit.
 
 ---
 
@@ -65,20 +78,16 @@ report  = auditor.run_all()
 report.print_report()
 
 print(report.overall_verdict)  # "PASS" | "WARN" | "FAIL"
-print(report.summary())        # one-line summary of all tests
 ```
 
-### What you get back
+### Full output
 
 ```python
-report.dsr_result           # Deflated Sharpe (dict)
-report.monte_carlo_result   # MC permutation test (dict)
-report.pbo_result           # Probability of overfitting (dict)
 report.economic_result      # Cohen's d, MDE, R^2, break-even cost
-report.walk_forward_result  # OOS hit rate, IS/OOS correlation
-report.regime_result        # Per-regime DSR+MC (low/high vol, trend)
-report.robustness_report    # 7-scenario stress test survival
-report.to_dict()            # Full JSON-serialisable report
+report.walk_forward_result  # OOS hit rate, IS/OOS Sharpe correlation
+report.regime_result        # Per-regime DSR+MC (low/high vol, trend/counter)
+report.robustness_report    # 7-scenario stress test survival rate
+report.to_dict()            # JSON-serialisable — pipe to any dashboard
 ```
 
 ---
@@ -91,21 +100,17 @@ uvicorn backtest_audit.api:app --reload
 # -> http://localhost:8000/docs
 ```
 
-9 endpoints:
-
-| Method | Endpoint | What |
-|--------|----------|------|
-| POST | `/audit` | Full audit — all 8 tests |
-| POST | `/audit/dsr` | DSR only |
-| POST | `/audit/mc` | Monte Carlo only |
-| POST | `/audit/pbo` | PBO (requires returns matrix) |
-| POST | `/audit/sensitivity` | Parameter sensitivity |
-| POST | `/audit/economic` | Economic significance |
-| POST | `/audit/walk-forward` | Walk-forward OOS |
-| POST | `/audit/regime` | Regime-conditional audit |
-| POST | `/audit/robustness` | Stress test battery |
-| GET | `/health` | Liveness |
-| GET | `/metrics` | Request counters |
+| Endpoint | What |
+|----------|------|
+| `POST /audit` | Full 8-test audit |
+| `POST /audit/dsr` | DSR only |
+| `POST /audit/mc` | Monte Carlo only |
+| `POST /audit/pbo` | PBO (returns matrix) |
+| `POST /audit/sensitivity` | Parameter sensitivity |
+| `POST /audit/economic` | Effect size, MDE, R^2 |
+| `POST /audit/walk-forward` | OOS validation |
+| `POST /audit/regime` | Regime-conditional audit |
+| `POST /audit/robustness` | Stress battery |
 
 ---
 
@@ -114,6 +119,7 @@ uvicorn backtest_audit.api:app --reload
 ```bash
 docker build --target production -t backtest-audit .
 docker run -p 8000:8000 backtest-audit
+# -> http://localhost:8000/health
 ```
 
 ---
@@ -123,7 +129,7 @@ docker run -p 8000:8000 backtest-audit
 ```bash
 pip install -e ".[dev,api]"
 pytest tests/ -v          # 124 tests, ~5s, zero network calls
-ruff check src/ tests/    # lint
+ruff check src/ tests/    # lint clean
 ```
 
 ---
