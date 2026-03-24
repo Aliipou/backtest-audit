@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      target: production
+    image: backtest-audit:latest
+    container_name: backtest-audit-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      LOG_LEVEL: INFO
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - audit_logs:/app/logs
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  test:
+    build:
+      context: .
+      target: deps
+    image: backtest-audit:test
+    container_name: backtest-audit-test
+    command: >
+      sh -c "pip install -e '.[dev,api]' && pytest tests/ -v --tb=short --ignore=tests/test_api.py"
+    volumes:
+      - .:/app
+    profiles:
+      - test
+
+volumes:
+  audit_logs:
