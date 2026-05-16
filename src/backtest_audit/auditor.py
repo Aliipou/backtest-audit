@@ -15,9 +15,12 @@ Usage
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 from .deflated_sharpe import deflated_sharpe_ratio
 from .economic_significance import EconomicSignificanceResult, economic_significance
@@ -445,7 +448,8 @@ class BacktestAuditor:
         if include_walk_forward and len(self._returns) >= (wf_n_splits + 1) * 20:
             try:
                 wf = self.run_walk_forward(n_splits=wf_n_splits, periods_per_year=periods_per_year)
-            except ValueError:
+            except ValueError as exc:
+                logger.debug("walk_forward skipped due to insufficient data: %s", exc)
                 wf = None
 
         regime = None
@@ -455,14 +459,16 @@ class BacktestAuditor:
                     periods_per_year=periods_per_year,
                     n_permutations=min(n_permutations, 200),
                 )
-            except ValueError:
+            except ValueError as exc:
+                logger.debug("regime_audit skipped due to insufficient data: %s", exc)
                 regime = None
 
         rob = None
         if include_robustness and len(self._returns) >= 10:
             try:
                 rob = self.run_robustness(periods_per_year=periods_per_year)
-            except ValueError:
+            except ValueError as exc:
+                logger.debug("robustness skipped due to insufficient data: %s", exc)
                 rob = None
 
         return AuditReport(
